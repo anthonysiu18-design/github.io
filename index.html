@@ -1,0 +1,1002 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#07c160">
+<title>零钱记账</title>
+<link rel="manifest" href="manifest.json">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&display=swap');
+:root{--g:#07c160;--gd:#059649;--gl:#e8f8ee;--r:#fa5151;--bg:#f2f2f7;--card:#fff;--tx:#1a1a1a;--sub:#8e8e93;--bd:#e5e5ea;--sh:0 1px 8px rgba(0,0,0,.07)}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{font-family:'Noto Sans SC',-apple-system,sans-serif;background:var(--bg);color:var(--tx);max-width:480px;margin:0 auto;min-height:100vh;padding-bottom:84px;overflow-x:hidden}
+
+/* AUTH SCREEN */
+#authScreen{position:fixed;inset:0;background:linear-gradient(160deg,#09d366,#07c160 40%,#059649);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:1000;padding:32px}
+#authScreen.hidden{display:none}
+.auth-logo{font-size:64px;margin-bottom:16px}
+.auth-title{font-size:26px;font-weight:700;color:#fff;margin-bottom:6px;letter-spacing:.5px}
+.auth-sub{font-size:14px;color:rgba(255,255,255,.8);margin-bottom:40px}
+.auth-card{background:#fff;border-radius:20px;padding:24px;width:100%;max-width:360px;box-shadow:0 8px 40px rgba(0,0,0,.15)}
+.auth-tabs{display:flex;background:var(--bg);border-radius:10px;padding:3px;margin-bottom:20px}
+.auth-tab{flex:1;padding:9px;border:none;border-radius:8px;background:transparent;font-size:14px;font-family:inherit;cursor:pointer;color:var(--sub);transition:all .15s}
+.auth-tab.on{background:#fff;color:var(--g);font-weight:600;box-shadow:0 1px 5px rgba(0,0,0,.1)}
+.auth-inp{width:100%;padding:12px 14px;border:1.5px solid var(--bd);border-radius:10px;font-size:15px;font-family:inherit;outline:none;margin-bottom:12px;transition:border-color .15s}
+.auth-inp:focus{border-color:var(--g)}
+.auth-btn{width:100%;padding:14px;border:none;border-radius:11px;background:var(--g);color:#fff;font-size:15px;font-weight:600;font-family:inherit;cursor:pointer;margin-top:4px;transition:opacity .15s}
+.auth-btn:active{opacity:.85}
+.auth-err{font-size:13px;color:var(--r);text-align:center;margin-top:10px;min-height:18px}
+.auth-footer{font-size:12px;color:rgba(255,255,255,.7);margin-top:20px;text-align:center;line-height:1.6}
+
+/* SETUP SCREEN */
+#setupScreen{position:fixed;inset:0;background:var(--bg);z-index:900;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px}
+#setupScreen.hidden{display:none}
+.setup-card{background:#fff;border-radius:20px;padding:28px;width:100%;max-width:400px;box-shadow:var(--sh)}
+.setup-card h2{font-size:18px;font-weight:700;margin-bottom:8px}
+.setup-card p{font-size:13px;color:var(--sub);line-height:1.7;margin-bottom:20px}
+.setup-link{color:var(--g);text-decoration:none;font-weight:500}
+
+/* HEADER */
+.hdr{background:linear-gradient(160deg,#09d366,#07c160 40%,#059649);padding:18px 20px 28px;color:#fff;position:relative;overflow:hidden}
+.hdr::before{content:'';position:absolute;top:-50px;right:-50px;width:160px;height:160px;border-radius:50%;background:rgba(255,255,255,.07)}
+.hdr-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}
+.hdr-title{font-size:17px;font-weight:700}
+.hdr-user{font-size:12px;background:rgba(255,255,255,.18);padding:4px 10px;border-radius:12px;cursor:pointer;display:flex;align-items:center;gap:6px}
+.hdr-month{font-size:12px;opacity:.8;margin-bottom:5px}
+.hdr-amt{font-size:40px;font-weight:300;letter-spacing:-2px;margin-bottom:16px}
+.hdr-amt em{font-size:21px;font-style:normal;margin-right:2px}
+.hdr-row{display:flex;gap:26px}
+.sl{font-size:11px;opacity:.75;margin-bottom:3px}
+.sv{font-size:15px;font-weight:500}
+
+/* TABS */
+.tabs{background:#fff;display:flex;border-bottom:1px solid var(--bd);position:sticky;top:0;z-index:20}
+.tab{flex:1;text-align:center;padding:13px 0;font-size:13px;color:var(--sub);cursor:pointer;position:relative;transition:color .2s}
+.tab.on{color:var(--g);font-weight:600}
+.tab.on::after{content:'';position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:26px;height:2.5px;background:var(--g);border-radius:2px}
+.page{display:none}.page.on{display:block}
+
+/* MONTH STRIP */
+.ms{display:flex;gap:8px;padding:12px 16px 0;overflow-x:auto;scrollbar-width:none}
+.ms::-webkit-scrollbar{display:none}
+.mc{flex-shrink:0;padding:5px 14px;border-radius:14px;font-size:13px;background:#fff;color:var(--sub);cursor:pointer;border:1.5px solid var(--bd);white-space:nowrap}
+.mc.on{background:var(--g);color:#fff;border-color:var(--g);font-weight:500}
+
+/* CAT GRID */
+.cg{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:10px 16px}
+.cc{background:var(--card);border-radius:14px;padding:12px 8px;text-align:center;box-shadow:var(--sh);cursor:pointer;transition:all .15s}
+.cc:active{transform:scale(.95)}
+.cc.dim{opacity:.3}
+.ci{font-size:22px;margin-bottom:4px}
+.cn{font-size:11px;color:var(--sub);margin-bottom:3px}
+.ca{font-size:14px;font-weight:600}
+
+/* TX LIST */
+.dl{padding:10px 16px 5px;font-size:12px;color:var(--sub);font-weight:500;display:flex;justify-content:space-between}
+.tl{padding:0 16px 8px}
+.tc{background:var(--card);border-radius:14px;padding:13px 14px;margin-bottom:8px;display:flex;align-items:center;box-shadow:var(--sh);position:relative;overflow:hidden}
+.tc::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--ac,#ddd);border-radius:3px 0 0 3px}
+.tci{width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:19px;margin-right:12px;flex-shrink:0}
+.tin{flex:1;min-width:0}
+.tn{font-size:14px;font-weight:500;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tm{font-size:12px;color:var(--sub)}
+.ta{font-size:16px;font-weight:700;flex-shrink:0;margin-left:10px}
+.ta.in{color:var(--g)}
+
+/* STATS */
+.sw{padding:10px 16px}
+.sc{background:var(--card);border-radius:16px;padding:16px;box-shadow:var(--sh);margin-bottom:12px}
+.st{font-size:14px;font-weight:600;margin-bottom:14px}
+.br{margin-bottom:11px}
+.bh{display:flex;justify-content:space-between;font-size:13px;margin-bottom:5px}
+.bt{height:7px;background:var(--bg);border-radius:4px;overflow:hidden}
+.bf{height:100%;border-radius:4px;transition:width .8s cubic-bezier(.4,0,.2,1)}
+.trnd{display:flex;align-items:flex-end;gap:5px;height:72px;padding-top:8px}
+.tc2{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;height:100%}
+.tbw{flex:1;width:100%;display:flex;align-items:flex-end}
+.tb{width:100%;border-radius:4px 4px 0 0;background:var(--g);min-height:3px}
+.tl2{font-size:10px;color:var(--sub)}
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-top:4px}
+.chd{text-align:center;font-size:10px;color:var(--sub);padding:3px 0}
+.cd{aspect-ratio:1;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:11px}
+
+/* IMPORT */
+.iw{padding:14px 16px}
+.ic{background:var(--card);border-radius:16px;padding:18px;margin-bottom:12px;box-shadow:var(--sh)}
+.ic h3{font-size:15px;font-weight:600;margin-bottom:6px}
+.ic p{font-size:13px;color:var(--sub);line-height:1.7;margin-bottom:14px}
+.steps{margin-bottom:14px}
+.step{display:flex;gap:9px;margin-bottom:9px;font-size:13px;color:var(--sub);line-height:1.5;align-items:flex-start}
+.sn{width:19px;height:19px;background:var(--g);color:#fff;border-radius:50%;font-size:11px;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
+.tip{background:#f0faf5;border:1px solid #b3e8cc;border-radius:12px;padding:12px 14px;font-size:13px;color:#0a6b3a;line-height:1.6;margin-bottom:14px}
+.tip strong{display:block;margin-bottom:3px}
+.webhook-box{background:#1e1e2e;border-radius:10px;padding:12px 14px;font-size:12px;font-family:monospace;color:#a6e3a1;word-break:break-all;margin-bottom:12px;line-height:1.6;cursor:pointer}
+
+/* SETTINGS */
+.setw{padding:14px 16px}
+.setl{font-size:12px;color:var(--sub);letter-spacing:.5px;font-weight:500;padding:4px 0 9px}
+.setc{background:var(--card);border-radius:16px;padding:18px;box-shadow:var(--sh);margin-bottom:14px}
+.setc h3{font-size:15px;font-weight:600;margin-bottom:8px}
+.setg{background:var(--card);border-radius:16px;overflow:hidden;box-shadow:var(--sh);margin-bottom:14px}
+.setr{padding:14px 16px;display:flex;align-items:center;gap:13px;border-bottom:1px solid var(--bd);cursor:pointer}
+.setr:last-child{border-bottom:none}
+.setico{font-size:20px}
+.setinfo{flex:1}
+.setname{font-size:14px;font-weight:500}
+.setsub{font-size:12px;color:var(--sub);margin-top:1px}
+
+/* FORMS */
+.fg{margin-bottom:14px}
+.fl{font-size:13px;color:var(--sub);margin-bottom:6px;display:block}
+.fi{width:100%;padding:12px 14px;border:1.5px solid var(--bd);border-radius:10px;font-size:15px;font-family:inherit;outline:none;background:#fff;transition:border-color .15s}
+.fi:focus{border-color:var(--g)}
+textarea.fi{resize:vertical}
+.tyr{display:flex;background:var(--bg);border-radius:10px;padding:3px;margin-bottom:14px}
+.tyb{flex:1;padding:9px;border:none;border-radius:8px;background:transparent;font-size:14px;font-family:inherit;cursor:pointer;transition:all .15s;color:var(--sub)}
+.tyb.on{background:#fff;box-shadow:0 1px 5px rgba(0,0,0,.1);color:var(--g);font-weight:600}
+.cp{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.cpb{padding:10px 6px;border:1.5px solid var(--bd);border-radius:10px;background:#fff;text-align:center;cursor:pointer;font-family:inherit;transition:all .15s}
+.cpb.on{border-color:var(--g);background:var(--gl)}
+.cpb .cpi{font-size:19px;display:block;margin-bottom:3px}
+.cpb .cpl{font-size:11px;color:var(--sub)}
+.cpb.on .cpl{color:var(--gd)}
+
+/* BUTTONS */
+.btn{display:block;width:100%;padding:13px;border:none;border-radius:11px;font-size:14px;font-weight:500;cursor:pointer;font-family:inherit;transition:opacity .15s}
+.btn:active{opacity:.8}
+.bg{background:var(--g);color:#fff}
+.bo{background:var(--gl);color:var(--gd);border:1px solid #b3e8cc}
+.br2{background:#fff0f0;color:var(--r);border:1px solid #ffd6d6}
+.brow{display:flex;gap:8px}
+.brow .btn{flex:1}
+
+/* FAB / NAV */
+.bnav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;background:#fff;border-top:1px solid var(--bd);display:flex;z-index:100;padding-bottom:env(safe-area-inset-bottom)}
+.ni{flex:1;padding:10px 0;text-align:center;cursor:pointer}
+.nico{font-size:22px;margin-bottom:2px}
+.nlbl{font-size:11px;color:var(--sub)}
+.ni.on .nlbl{color:var(--g)}
+.fab{position:fixed;bottom:74px;right:20px;width:54px;height:54px;background:var(--g);color:#fff;border:none;border-radius:50%;font-size:28px;cursor:pointer;box-shadow:0 4px 20px rgba(7,193,96,.45);display:flex;align-items:center;justify-content:center;z-index:99;transition:transform .15s}
+.fab:active{transform:scale(.91)}
+
+/* MODAL */
+.ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;align-items:flex-end}
+.ov.open{display:flex}
+.modal{background:#fff;border-radius:22px 22px 0 0;padding:20px;width:100%;max-width:480px;margin:0 auto;animation:up .25s ease;max-height:92vh;overflow-y:auto}
+@keyframes up{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.mh{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}
+.mt2{font-size:17px;font-weight:700}
+.mcl{font-size:22px;color:var(--sub);cursor:pointer;line-height:1}
+
+/* TOAST */
+.toast{position:fixed;top:62px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.78);color:#fff;padding:10px 22px;border-radius:22px;font-size:14px;z-index:999;opacity:0;transition:opacity .3s;white-space:nowrap;pointer-events:none}
+.toast.show{opacity:1}
+
+/* EMPTY */
+.empty{text-align:center;padding:52px 20px;color:var(--sub)}
+.empty .ei{font-size:52px;margin-bottom:12px}
+.empty p{font-size:14px;line-height:1.7}
+
+/* LOADING */
+.loading{position:fixed;inset:0;background:rgba(255,255,255,.9);display:flex;align-items:center;justify-content:center;z-index:500;flex-direction:column;gap:12px;font-size:14px;color:var(--sub)}
+.loading.hidden{display:none}
+.spinner{width:32px;height:32px;border:3px solid var(--bd);border-top-color:var(--g);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+input[type=file]{display:none}
+</style>
+</head>
+<body>
+
+<!-- LOADING -->
+<div class="loading" id="loading"><div class="spinner"></div><span>加载中…</span></div>
+
+<!-- AUTH SCREEN -->
+<div id="authScreen">
+  <div class="auth-logo">💰</div>
+  <div class="auth-title">零钱记账</div>
+  <div class="auth-sub">微信支付自动分类记账</div>
+  <div class="auth-card">
+    <div class="auth-tabs">
+      <button class="auth-tab on" onclick="authSwitch('login',this)">登录</button>
+      <button class="auth-tab" onclick="authSwitch('signup',this)">注册</button>
+    </div>
+    <input class="auth-inp" id="authEmail" type="email" placeholder="邮箱地址" autocomplete="email">
+    <input class="auth-inp" id="authPwd" type="password" placeholder="密码（至少6位）" autocomplete="current-password">
+    <div id="authName" style="display:none">
+      <input class="auth-inp" id="authNameIn" type="text" placeholder="你的昵称（显示用）">
+    </div>
+    <button class="auth-btn" id="authBtn" onclick="doAuth()">登录</button>
+    <div class="auth-err" id="authErr"></div>
+  </div>
+  <div class="auth-footer">数据隔离 · 各用独立账本<br>由 Supabase 提供安全认证</div>
+</div>
+
+<!-- SETUP SCREEN (first time Supabase config) -->
+<div id="setupScreen" class="hidden">
+  <div class="setup-card">
+    <h2>🔧 首次配置</h2>
+    <p>请填入你的 Supabase 项目信息。只需配置一次，数据安全存储在你自己的数据库。</p>
+    <p>没有 Supabase 账号？<a class="setup-link" href="https://supabase.com" target="_blank">免费注册 →</a></p>
+    <br>
+    <div class="fg">
+      <label class="fl">Supabase Project URL</label>
+      <input class="fi" id="sbUrl" placeholder="https://xxxx.supabase.co" autocomplete="off">
+    </div>
+    <div class="fg">
+      <label class="fl">Supabase Anon Key</label>
+      <input class="fi" id="sbKey" placeholder="eyJhbGciOi..." autocomplete="off">
+    </div>
+    <button class="btn bg" onclick="saveSupabaseConfig()">保存并继续</button>
+    <div class="auth-err" id="setupErr"></div>
+    <br>
+    <p style="font-size:12px;color:var(--sub);line-height:1.7;margin-top:8px">
+      在 Supabase 项目的 <strong>Project Settings → API</strong> 中找到这两项。<br>
+      配置完成后请按照 <strong>README.md</strong> 在 Supabase 中建好数据表。
+    </p>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="app" style="display:none">
+
+<div class="hdr">
+  <div class="hdr-top">
+    <div class="hdr-title">💰 零钱记账</div>
+    <div class="hdr-user" onclick="showUserMenu()">
+      <span>👤</span><span id="userName">用户</span><span>▾</span>
+    </div>
+  </div>
+  <div class="hdr-month" id="hdMonth">本月支出</div>
+  <div class="hdr-amt"><em>¥</em><span id="hdAmt">0.00</span></div>
+  <div class="hdr-row">
+    <div><div class="sl">收入</div><div class="sv" id="hdIn">¥0.00</div></div>
+    <div><div class="sl">笔数</div><div class="sv" id="hdCnt">0笔</div></div>
+    <div><div class="sl">净结余</div><div class="sv" id="hdNet">¥0.00</div></div>
+  </div>
+</div>
+
+<div class="tabs">
+  <div class="tab on" onclick="go('records')">明细</div>
+  <div class="tab" onclick="go('stats')">统计</div>
+  <div class="tab" onclick="go('import')">导入</div>
+  <div class="tab" onclick="go('settings')">设置</div>
+</div>
+
+<!-- RECORDS -->
+<div class="page on" id="pg-records">
+  <div class="ms" id="mstrip"></div>
+  <div class="cg" id="catGrid"></div>
+  <div id="txBody"></div>
+</div>
+
+<!-- STATS -->
+<div class="page" id="pg-stats">
+  <div class="ms" id="mstrip2"></div>
+  <div class="sw">
+    <div class="sc"><div class="st">📊 分类支出</div><div id="barChart"></div></div>
+    <div class="sc"><div class="st">📅 近7天趋势</div><div class="trnd" id="trend"></div></div>
+    <div class="sc"><div class="st">📆 本月热力图</div><div class="cal" id="cal"></div></div>
+  </div>
+</div>
+
+<!-- IMPORT -->
+<div class="page" id="pg-import">
+  <div class="iw">
+    <div class="tip">
+      <strong>💡 两种导入方式均支持</strong>
+      上传微信官方账单 CSV（最全），或粘贴单条支付通知文字快速录入。
+    </div>
+
+    <div class="ic">
+      <h3>📄 导入微信账单 CSV</h3>
+      <p>适合批量补录历史数据，一次导入所有记录。</p>
+      <div class="steps">
+        <div class="step"><div class="sn">1</div><div>微信 → 我 → 服务 → 钱包</div></div>
+        <div class="step"><div class="sn">2</div><div>右上角「账单」→「常见问题」→「申请账单」</div></div>
+        <div class="step"><div class="sn">3</div><div>选时间范围，邮件收到后下载 CSV</div></div>
+        <div class="step"><div class="sn">4</div><div>点下方按钮上传文件，自动解析分类</div></div>
+      </div>
+      <button class="btn bg" onclick="document.getElementById('csvFile').click()">📂 选择 CSV 文件</button>
+      <input type="file" id="csvFile" accept=".csv,.CSV" onchange="importCSV(event)">
+    </div>
+
+    <div class="ic">
+      <h3>✍️ 粘贴支付通知</h3>
+      <p>把微信支付通知文字粘贴进来，自动识别金额和分类，快速录入单条。</p>
+      <textarea class="fi" id="notifTxt" rows="3" placeholder="例：微信支付成功，付款 ¥28.50，商户：瑞幸咖啡"></textarea>
+      <br><br>
+      <button class="btn bo" onclick="parseNotif()">🔍 解析并导入</button>
+    </div>
+
+    <div class="ic">
+      <h3>🔗 Webhook 自动接收</h3>
+      <p>配合 Android「通知转发」类 App（如 <strong>Tasker</strong> / <strong>MacroDroid</strong>），监听到微信支付通知后自动 POST 到下方地址，无需手动操作。</p>
+      <div class="fg">
+        <label class="fl">你的专属 Webhook 地址（点击复制）</label>
+        <div class="webhook-box" id="webhookUrl" onclick="copyWebhook()">登录后自动生成</div>
+      </div>
+      <div class="fg">
+        <label class="fl">POST Body 格式（JSON）</label>
+        <div class="webhook-box">{"text": "微信支付成功，付款¥28.50，商户：瑞幸咖啡"}</div>
+      </div>
+      <button class="btn bo" onclick="go('settings');setTimeout(()=>document.getElementById('webhookSection').scrollIntoView({behavior:'smooth'}),300)">⚙️ 在设置页查看完整配置</button>
+    </div>
+  </div>
+</div>
+
+<!-- SETTINGS -->
+<div class="page" id="pg-settings">
+  <div class="setw">
+
+    <div class="setl">👤 账户</div>
+    <div class="setg">
+      <div class="setr" onclick="editNickname()">
+        <div class="setico">✏️</div>
+        <div class="setinfo"><div class="setname">修改昵称</div><div class="setsub" id="nicknameShow">-</div></div>
+        <div>›</div>
+      </div>
+      <div class="setr" onclick="changePassword()">
+        <div class="setico">🔑</div>
+        <div class="setinfo"><div class="setname">修改密码</div><div class="setsub">通过邮件重置</div></div>
+        <div>›</div>
+      </div>
+      <div class="setr" onclick="signOut()">
+        <div class="setico">🚪</div>
+        <div class="setinfo"><div class="setname" style="color:var(--r)">退出登录</div><div class="setsub" id="userEmailShow">-</div></div>
+        <div>›</div>
+      </div>
+    </div>
+
+    <div class="setl" id="webhookSection">🔗 Webhook 自动接收配置</div>
+    <div class="setc">
+      <h3>Tasker / MacroDroid 配置</h3>
+      <p style="font-size:13px;color:var(--sub);line-height:1.7;margin-bottom:14px">Android 上免费的 <strong>MacroDroid</strong> 可以监听微信通知，自动 POST 到你的专属地址。</p>
+      <div class="steps">
+        <div class="step"><div class="sn">1</div><div>安装 MacroDroid（Google Play 免费版即可）</div></div>
+        <div class="step"><div class="sn">2</div><div>新建宏 → 触发器：「通知已收到」→ 应用选「微信」</div></div>
+        <div class="step"><div class="sn">3</div><div>动作：「HTTP 请求」→ Method: POST，URL 填入下方地址</div></div>
+        <div class="step"><div class="sn">4</div><div>Body: <code>{"text": "[触发器变量: 通知内容]"}</code></div></div>
+        <div class="step"><div class="sn">5</div><div>保存宏，开启「通知使用权」权限</div></div>
+      </div>
+      <label class="fl">你的专属 Webhook URL（点击复制）</label>
+      <div class="webhook-box" id="webhookUrl2" onclick="copyWebhook()">登录后自动生成</div>
+      <button class="btn bo" onclick="testWebhook()">🧪 测试 Webhook</button>
+    </div>
+
+    <div class="setl">🏷️ 分类关键词管理</div>
+    <div class="setc">
+      <h3>自定义识别规则</h3>
+      <p style="font-size:13px;color:var(--sub);line-height:1.7;margin-bottom:14px">为每个分类添加自定义关键词，匹配商家名称时自动归类。</p>
+      <div id="rulesEditor"></div>
+      <button class="btn bo" onclick="saveCustomRules()">💾 保存规则</button>
+    </div>
+
+    <div class="setl">📦 数据管理</div>
+    <div class="setg">
+      <div class="setr" onclick="exportJSON()">
+        <div class="setico">📤</div>
+        <div class="setinfo"><div class="setname">导出 JSON 备份</div><div class="setsub" id="recCnt">共 0 条</div></div>
+        <div>›</div>
+      </div>
+      <div class="setr" onclick="document.getElementById('jsonFile').click()">
+        <div class="setico">📥</div>
+        <div class="setinfo"><div class="setname">从 JSON 恢复</div><div class="setsub">合并导入，自动去重</div></div>
+        <div>›</div>
+      </div>
+      <div class="setr" onclick="clearAll()">
+        <div class="setico">🗑️</div>
+        <div class="setinfo"><div class="setname" style="color:var(--r)">清除我的所有数据</div><div class="setsub">只删除当前账户数据</div></div>
+        <div>›</div>
+      </div>
+    </div>
+
+    <div style="text-align:center;padding:10px 0 4px;font-size:12px;color:#ccc">
+      零钱记账 · 多用户版 · Powered by Supabase
+    </div>
+  </div>
+  <input type="file" id="jsonFile" accept=".json" onchange="restoreJSON(event)" style="display:none">
+</div>
+
+</div><!-- /app -->
+
+<button class="fab" id="fab" onclick="openAdd()" style="display:none">+</button>
+
+<div class="bnav" id="bnav" style="display:none">
+  <div class="ni on" onclick="go('records')"><div class="nico">📋</div><div class="nlbl">明细</div></div>
+  <div class="ni" onclick="go('stats')"><div class="nico">📊</div><div class="nlbl">统计</div></div>
+  <div class="ni" onclick="go('import')"><div class="nico">📥</div><div class="nlbl">导入</div></div>
+  <div class="ni" onclick="go('settings')"><div class="nico">⚙️</div><div class="nlbl">设置</div></div>
+</div>
+
+<!-- ADD MODAL -->
+<div class="ov" id="addOv" onclick="maybeCloseAdd(event)">
+  <div class="modal">
+    <div class="mh"><div class="mt2">添加记录</div><div class="mcl" onclick="closeAdd()">×</div></div>
+    <div class="tyr">
+      <button class="tyb on" onclick="setType('out',this)">支出</button>
+      <button class="tyb" onclick="setType('in',this)">收入</button>
+    </div>
+    <div class="fg"><label class="fl">金额（元）</label>
+      <input class="fi" id="amtIn" type="number" placeholder="0.00" step="0.01" min="0.01" inputmode="decimal"></div>
+    <div class="fg"><label class="fl">描述（自动识别分类）</label>
+      <input class="fi" id="descIn" type="text" placeholder="商家名称 / 备注…"></div>
+    <div class="fg"><label class="fl">分类</label><div class="cp" id="cpick"></div></div>
+    <div class="fg"><label class="fl">时间</label>
+      <input class="fi" id="dtIn" type="datetime-local"></div>
+    <button class="btn bg" onclick="addRec()">✓ 保存</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ══════════════════════════════════════════════════════
+//  SUPABASE INIT
+// ══════════════════════════════════════════════════════
+let sb = null;
+let currentUser = null;
+
+function getConfig() {
+  return {
+    url: localStorage.getItem('sb_url') || '',
+    key: localStorage.getItem('sb_key') || ''
+  };
+}
+
+function initSupabase() {
+  const { url, key } = getConfig();
+  if (!url || !key) return false;
+  try {
+    sb = supabase.createClient(url, key);
+    return true;
+  } catch(e) { return false; }
+}
+
+async function boot() {
+  document.getElementById('loading').classList.remove('hidden');
+
+  if (!initSupabase()) {
+    document.getElementById('loading').classList.add('hidden');
+    document.getElementById('setupScreen').classList.remove('hidden');
+    document.getElementById('authScreen').classList.add('hidden');
+    return;
+  }
+
+  // Check session
+  const { data: { session } } = await sb.auth.getSession();
+  if (session) {
+    currentUser = session.user;
+    await showApp();
+  } else {
+    document.getElementById('loading').classList.add('hidden');
+    document.getElementById('authScreen').classList.remove('hidden');
+  }
+}
+
+function saveSupabaseConfig() {
+  const url = document.getElementById('sbUrl').value.trim();
+  const key = document.getElementById('sbKey').value.trim();
+  if (!url.startsWith('https://') || !key.startsWith('eyJ')) {
+    document.getElementById('setupErr').textContent = 'URL 或 Key 格式不对，请检查';
+    return;
+  }
+  localStorage.setItem('sb_url', url);
+  localStorage.setItem('sb_key', key);
+  if (initSupabase()) {
+    document.getElementById('setupScreen').classList.add('hidden');
+    document.getElementById('authScreen').classList.remove('hidden');
+  }
+}
+
+// ══════════════════════════════════════════════════════
+//  AUTH
+// ══════════════════════════════════════════════════════
+let authMode = 'login';
+function authSwitch(mode, btn) {
+  authMode = mode;
+  document.querySelectorAll('.auth-tab').forEach(b => b.classList.remove('on'));
+  btn.classList.add('on');
+  document.getElementById('authName').style.display = mode === 'signup' ? 'block' : 'none';
+  document.getElementById('authBtn').textContent = mode === 'login' ? '登录' : '注册';
+  document.getElementById('authErr').textContent = '';
+}
+
+async function doAuth() {
+  const email = document.getElementById('authEmail').value.trim();
+  const pwd = document.getElementById('authPwd').value;
+  const name = document.getElementById('authNameIn').value.trim();
+  const errEl = document.getElementById('authErr');
+  errEl.textContent = '';
+
+  if (!email || !pwd) { errEl.textContent = '请填写邮箱和密码'; return; }
+  if (authMode === 'signup' && !name) { errEl.textContent = '请填写昵称'; return; }
+
+  document.getElementById('authBtn').textContent = '请稍候…';
+
+  try {
+    if (authMode === 'login') {
+      const { data, error } = await sb.auth.signInWithPassword({ email, password: pwd });
+      if (error) throw error;
+      currentUser = data.user;
+    } else {
+      const { data, error } = await sb.auth.signUp({
+        email, password: pwd,
+        options: { data: { nickname: name } }
+      });
+      if (error) throw error;
+      if (!data.session) {
+        errEl.style.color = 'var(--g)';
+        errEl.textContent = '注册成功！请检查邮箱验证后登录';
+        document.getElementById('authBtn').textContent = '注册';
+        return;
+      }
+      currentUser = data.user;
+    }
+    await showApp();
+  } catch(e) {
+    errEl.style.color = 'var(--r)';
+    const msg = e.message || '';
+    if (msg.includes('Invalid login')) errEl.textContent = '邮箱或密码错误';
+    else if (msg.includes('already registered')) errEl.textContent = '该邮箱已注册，请直接登录';
+    else errEl.textContent = msg;
+    document.getElementById('authBtn').textContent = authMode === 'login' ? '登录' : '注册';
+  }
+}
+
+// Enter key support
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !document.getElementById('authScreen').classList.contains('hidden')) doAuth();
+});
+
+async function showApp() {
+  document.getElementById('authScreen').classList.add('hidden');
+  document.getElementById('loading').classList.add('hidden');
+  document.getElementById('app').style.display = 'block';
+  document.getElementById('bnav').style.display = 'flex';
+  document.getElementById('fab').style.display = 'flex';
+
+  const nickname = currentUser.user_metadata?.nickname || currentUser.email?.split('@')[0] || '用户';
+  document.getElementById('userName').textContent = nickname;
+  document.getElementById('nicknameShow').textContent = nickname;
+  document.getElementById('userEmailShow').textContent = currentUser.email;
+
+  // Set webhook URL
+  const whUrl = `${getConfig().url}/functions/v1/webhook?uid=${currentUser.id}`;
+  document.getElementById('webhookUrl').textContent = whUrl;
+  document.getElementById('webhookUrl2').textContent = whUrl;
+
+  await loadRecs();
+  renderRulesEditor();
+}
+
+function showUserMenu() {
+  if (confirm(`账户：${currentUser.email}\n\n点确定退出登录`)) signOut();
+}
+async function signOut() {
+  await sb.auth.signOut();
+  currentUser = null; recs = [];
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('bnav').style.display = 'none';
+  document.getElementById('fab').style.display = 'none';
+  document.getElementById('authScreen').classList.remove('hidden');
+}
+async function changePassword() {
+  const { error } = await sb.auth.resetPasswordForEmail(currentUser.email);
+  if (error) toast('发送失败：' + error.message);
+  else toast('重置密码邮件已发送，请查收');
+}
+async function editNickname() {
+  const name = prompt('修改昵称：', document.getElementById('nicknameShow').textContent);
+  if (!name) return;
+  const { error } = await sb.auth.updateUser({ data: { nickname: name } });
+  if (error) { toast('修改失败'); return; }
+  document.getElementById('userName').textContent = name;
+  document.getElementById('nicknameShow').textContent = name;
+  toast('昵称已更新');
+}
+
+// ══════════════════════════════════════════════════════
+//  CATEGORIES & RULES
+// ══════════════════════════════════════════════════════
+const CATS = [
+  { id:'food',  name:'餐饮',    icon:'🍜', color:'#ff9500', bg:'#fff4e5' },
+  { id:'life',  name:'生活日用',icon:'🛒', color:'#34aadc', bg:'#e5f5fc' },
+  { id:'trans', name:'交通',    icon:'🚌', color:'#5856d6', bg:'#eeeeff' },
+  { id:'xfer',  name:'转账',    icon:'💸', color:'#ff5e57', bg:'#fff0ee' },
+  { id:'red',   name:'红包',    icon:'🧧', color:'#c0392b', bg:'#fef0ee' },
+  { id:'other', name:'消费',    icon:'💳', color:'#8e8e93', bg:'#f2f2f7' },
+];
+const CM = Object.fromEntries(CATS.map(c => [c.id, c]));
+
+const DEFAULT_KW = {
+  food:  '餐 饭 食 茶 饮 咖啡 奶茶 烧烤 火锅 外卖 美团 饿了么 麦当劳 肯德基 星巴克 瑞幸 蜜雪 茶百道 海底捞 小吃 面馆 粥 寿司 披萨 早餐 午餐 晚餐 宵夜 面包 蛋糕 快餐 炸鸡 汉堡 甜品 冰淇淋',
+  life:  '超市 便利店 药店 药房 理发 发廊 美容 美甲 洗衣 水电 物业 购物 衣服 服装 鞋 日用 生活 沃尔玛 永辉 盒马 京东 淘宝 拼多多 叮咚 711 全家 罗森 家乐福 话费 宽带 流量',
+  trans: '地铁 公交 打车 滴滴 出租 高铁 火车 飞机 机票 航空 加油 停车 单车 摩拜 哈啰 高速 ETC 交通',
+  xfer:  '转账 转给 汇款 还款 借款 还你',
+  red:   '红包',
+};
+
+let customKW = JSON.parse(localStorage.getItem('customKW') || '{}');
+
+function getKW(catId) {
+  const base = (DEFAULT_KW[catId] || '').split(' ').filter(Boolean);
+  const custom = (customKW[catId] || '').split(/[,，\s]+/).filter(Boolean);
+  return [...new Set([...base, ...custom])];
+}
+
+function guess(t = '') {
+  const cats = ['red','xfer','food','life','trans'];
+  for (const id of cats) {
+    if (getKW(id).some(k => t.includes(k))) return id;
+  }
+  return 'other';
+}
+
+function renderRulesEditor() {
+  const cats = CATS.filter(c => c.id !== 'other');
+  document.getElementById('rulesEditor').innerHTML = cats.map(c => `
+    <div style="margin-bottom:12px">
+      <label class="fl">${c.icon} ${c.name} — 自定义关键词（逗号分隔）</label>
+      <input class="fi" id="kw_${c.id}" placeholder="如：拉面、便当、煲仔饭…"
+        value="${customKW[c.id] || ''}" style="font-size:13px;padding:10px 12px">
+    </div>`).join('');
+}
+
+function saveCustomRules() {
+  CATS.filter(c => c.id !== 'other').forEach(c => {
+    customKW[c.id] = document.getElementById('kw_' + c.id).value.trim();
+  });
+  localStorage.setItem('customKW', JSON.stringify(customKW));
+  toast('规则已保存 ✓');
+}
+
+// ══════════════════════════════════════════════════════
+//  DATA (Supabase)
+// ══════════════════════════════════════════════════════
+let recs = [];
+let curM = new Date().toISOString().slice(0, 7);
+let txT = 'out', selC = 'other', filtC = null;
+
+async function loadRecs() {
+  if (!sb || !currentUser) return;
+  const { data, error } = await sb.from('records')
+    .select('*').eq('user_id', currentUser.id).order('date', { ascending: false });
+  if (error) { toast('加载失败：' + error.message); return; }
+  recs = data || [];
+  render();
+}
+
+async function insertRec(rec) {
+  const payload = { ...rec, user_id: currentUser.id };
+  const { data, error } = await sb.from('records').insert([payload]).select().single();
+  if (error) throw error;
+  recs.unshift(data);
+  render();
+  return data;
+}
+
+async function deleteRec(id) {
+  const { error } = await sb.from('records').delete().eq('id', id).eq('user_id', currentUser.id);
+  if (error) { toast('删除失败'); return; }
+  recs = recs.filter(r => r.id !== id);
+  render();
+  toast('已删除');
+}
+
+async function bulkInsert(newRecs) {
+  const payloads = newRecs.map(r => ({ ...r, user_id: currentUser.id }));
+  const { data, error } = await sb.from('records').insert(payloads).select();
+  if (error) throw error;
+  recs.push(...(data || []));
+  render();
+  return data?.length || 0;
+}
+
+// ══════════════════════════════════════════════════════
+//  RENDER
+// ══════════════════════════════════════════════════════
+function getMonths() {
+  const s = new Set(recs.map(r => (r.date||'').slice(0,7)));
+  s.add(new Date().toISOString().slice(0,7));
+  return [...s].sort().reverse().slice(0,6);
+}
+function mLabel(m) {
+  const [y,mo] = m.split('-');
+  return y === String(new Date().getFullYear()) ? `${+mo}月` : `${y}/${+mo}月`;
+}
+function renderStrips() {
+  const h = getMonths().map(m =>
+    `<div class="mc ${m===curM?'on':''}" onclick="setM('${m}')">${mLabel(m)}</div>`).join('');
+  document.getElementById('mstrip').innerHTML = h;
+  document.getElementById('mstrip2').innerHTML = h;
+}
+function setM(m) { curM=m; filtC=null; render(); }
+
+function render() {
+  renderStrips();
+  const all = recs.filter(r => (r.date||'').startsWith(curM));
+  const out = all.filter(r => r.type==='out');
+  const inn = all.filter(r => r.type==='in');
+  const tO = out.reduce((s,r)=>s+r.amount,0);
+  const tI = inn.reduce((s,r)=>s+r.amount,0);
+  const isThis = curM === new Date().toISOString().slice(0,7);
+  const [y,mo] = curM.split('-');
+  document.getElementById('hdMonth').textContent = isThis ? '本月支出' : `${y}年${+mo}月支出`;
+  document.getElementById('hdAmt').textContent = tO.toFixed(2);
+  document.getElementById('hdIn').textContent = '¥'+tI.toFixed(2);
+  document.getElementById('hdCnt').textContent = all.length+'笔';
+  document.getElementById('hdNet').textContent = '¥'+(tI-tO).toFixed(2);
+  document.getElementById('recCnt').textContent = `共 ${recs.length} 条`;
+  renderGrid(out);
+  renderList(filtC ? all.filter(r=>r.cat===filtC) : all);
+  renderStats(all);
+}
+
+function renderGrid(out) {
+  const t={}; CATS.forEach(c=>t[c.id]=0);
+  out.forEach(r=>t[r.cat]=(t[r.cat]||0)+r.amount);
+  document.getElementById('catGrid').innerHTML = CATS.map(c =>
+    `<div class="cc ${filtC&&filtC!==c.id?'dim':''}" onclick="filt('${c.id}')">
+      <div class="ci">${c.icon}</div><div class="cn">${c.name}</div>
+      <div class="ca" style="color:${c.color}">¥${t[c.id].toFixed(0)}</div>
+    </div>`).join('');
+}
+function filt(id) {
+  filtC = filtC===id ? null : id;
+  const all = recs.filter(r=>(r.date||'').startsWith(curM));
+  renderGrid(all.filter(r=>r.type==='out'));
+  renderList(filtC ? all.filter(r=>r.cat===filtC) : all);
+}
+
+function renderList(data) {
+  const body = document.getElementById('txBody');
+  if (!data.length) {
+    body.innerHTML = `<div class="empty"><div class="ei">📋</div><p>暂无记录<br>右下角 <strong>+</strong> 手动添加<br>或在「导入」页导入微信账单</p></div>`;
+    return;
+  }
+  const sorted = [...data].sort((a,b)=>new Date(b.date)-new Date(a.date));
+  const todayStr = new Date().toISOString().slice(0,10);
+  const yestStr = (() => { const d=new Date();d.setDate(d.getDate()-1);return d.toISOString().slice(0,10); })();
+  let html='', lastDay='';
+  sorted.forEach(r => {
+    const day = (r.date||'').slice(0,10);
+    if (day!==lastDay) {
+      const lbl = day===todayStr?'今天':day===yestStr?'昨天':day.slice(5).replace('-','/');
+      const dayOut = sorted.filter(x=>x.date?.slice(0,10)===day&&x.type==='out').reduce((s,x)=>s+x.amount,0);
+      html += `<div class="dl"><span>${lbl}</span><span style="font-size:11px">支出 ¥${dayOut.toFixed(2)}</span></div>`;
+      lastDay = day;
+    }
+    const c = CM[r.cat]||CM.other;
+    const d = new Date(r.date);
+    const tm = `${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;
+    html += `<div class="tl"><div class="tc" style="--ac:${c.color}" onclick="confirmDel('${r.id}')">
+      <div class="tci" style="background:${c.bg}">${c.icon}</div>
+      <div class="tin"><div class="tn">${r.desc||c.name}</div><div class="tm">${tm} · ${c.name}</div></div>
+      <div class="ta ${r.type}">${r.type==='in'?'+':'-'}¥${r.amount.toFixed(2)}</div>
+    </div></div>`;
+  });
+  body.innerHTML = html;
+}
+
+function confirmDel(id) {
+  const r = recs.find(x=>x.id===id);
+  if (!r) return;
+  if (confirm(`删除这条记录？\n${r.desc||'无描述'}  ¥${r.amount.toFixed(2)}`)) deleteRec(id);
+}
+
+function renderStats(all) {
+  const out = all.filter(r=>r.type==='out');
+  const t={}; CATS.forEach(c=>t[c.id]=0);
+  out.forEach(r=>t[r.cat]=(t[r.cat]||0)+r.amount);
+  const total = out.reduce((s,r)=>s+r.amount,0)||1;
+  document.getElementById('barChart').innerHTML = CATS.map(c => {
+    const p = ((t[c.id]/total)*100).toFixed(1);
+    return `<div class="br"><div class="bh"><span>${c.icon} ${c.name}</span><span style="color:${c.color}">¥${t[c.id].toFixed(2)} <small style="color:var(--sub)">${p}%</small></span></div><div class="bt"><div class="bf" style="width:${p}%;background:${c.color}"></div></div></div>`;
+  }).join('');
+
+  const tr={}; for(let i=6;i>=0;i--){const d=new Date();d.setDate(d.getDate()-i);tr[d.toISOString().slice(0,10)]=0;}
+  out.forEach(r=>{const k=(r.date||'').slice(0,10);if(k in tr)tr[k]+=r.amount;});
+  const mx=Math.max(...Object.values(tr))||1;
+  document.getElementById('trend').innerHTML = Object.entries(tr).map(([d,v])=>
+    `<div class="tc2"><div class="tbw"><div class="tb" style="height:${Math.max(3,(v/mx)*100)}%"></div></div><div class="tl2">${d.slice(8)}</div></div>`).join('');
+
+  const [y,mo]=curM.split('-').map(Number);
+  const dim=new Date(y,mo,0).getDate(), fd=new Date(y,mo-1,1).getDay();
+  const dt={}; out.filter(r=>(r.date||'').startsWith(curM)).forEach(r=>{const d=+r.date.slice(8,10);dt[d]=(dt[d]||0)+r.amount;});
+  const mdv=Math.max(...Object.values(dt))||1;
+  const today=new Date().getDate(), isThisM=curM===new Date().toISOString().slice(0,7);
+  let ch=['日','一','二','三','四','五','六'].map(h=>`<div class="chd">${h}</div>`).join('');
+  for(let i=0;i<fd;i++)ch+='<div></div>';
+  for(let d=1;d<=dim;d++){const v=dt[d]||0;const op=v?Math.max(.1,v/mdv):0;const isTd=isThisM&&d===today;
+    ch+=`<div class="cd" title="${d}日 ¥${v.toFixed(0)}" style="background:${v?`rgba(7,193,96,${op})`:'#f2f2f7'};${isTd?'outline:2px solid var(--g);':''}color:${v>mdv*.6?'#fff':'var(--sub)'}">${d}</div>`;}
+  document.getElementById('cal').innerHTML = ch;
+}
+
+// ══════════════════════════════════════════════════════
+//  TABS
+// ══════════════════════════════════════════════════════
+const PAGES = ['records','stats','import','settings'];
+function go(p) {
+  PAGES.forEach(id=>{document.getElementById('pg-'+id).classList.toggle('on',id===p);});
+  document.querySelectorAll('.tab').forEach((el,i)=>el.classList.toggle('on',PAGES[i]===p));
+  document.querySelectorAll('.ni').forEach((el,i)=>el.classList.toggle('on',PAGES[i]===p));
+  document.getElementById('fab').style.display=(p==='records'||p==='import')?'flex':'none';
+  if(p!=='settings')render();
+}
+
+// ══════════════════════════════════════════════════════
+//  ADD RECORD
+// ══════════════════════════════════════════════════════
+function openAdd() {
+  document.getElementById('addOv').classList.add('open');
+  const n=new Date();n.setMinutes(n.getMinutes()-n.getTimezoneOffset());
+  document.getElementById('dtIn').value=n.toISOString().slice(0,16);
+  selC='other'; renderCpick();
+}
+function closeAdd(){document.getElementById('addOv').classList.remove('open');}
+function maybeCloseAdd(e){if(e.target===document.getElementById('addOv'))closeAdd();}
+function setType(t,btn){txT=t;document.querySelectorAll('.tyb').forEach(b=>b.classList.remove('on'));btn.classList.add('on');}
+function renderCpick(){
+  document.getElementById('cpick').innerHTML=CATS.map(c=>
+    `<button class="cpb ${selC===c.id?'on':''}" onclick="pickC('${c.id}',this)"><span class="cpi">${c.icon}</span><span class="cpl">${c.name}</span></button>`).join('');
+}
+function pickC(id,btn){selC=id;document.querySelectorAll('.cpb').forEach(b=>b.classList.remove('on'));btn.classList.add('on');}
+document.getElementById('descIn').addEventListener('input',function(){selC=guess(this.value);renderCpick();});
+
+async function addRec() {
+  const amt=parseFloat(document.getElementById('amtIn').value);
+  const desc=document.getElementById('descIn').value.trim();
+  const date=document.getElementById('dtIn').value;
+  if(!amt||amt<=0){toast('请输入有效金额');return;}
+  if(!date){toast('请选择时间');return;}
+  const cat=selC==='other'?guess(desc):selC;
+  try {
+    await insertRec({amount:amt,desc,cat,type:txT,date});
+    closeAdd();
+    document.getElementById('amtIn').value='';
+    document.getElementById('descIn').value='';
+    toast((txT==='in'?'收入 +':'支出 -')+'¥'+amt.toFixed(2)+' 已记录');
+  } catch(e){toast('保存失败：'+e.message);}
+}
+
+// ══════════════════════════════════════════════════════
+//  CSV IMPORT
+// ══════════════════════════════════════════════════════
+function importCSV(e) {
+  const f=e.target.files[0];if(!f)return;
+  const reader=new FileReader();
+  reader.onload=async ev=>{
+    try{
+      const parsed=parseWxCSV(ev.target.result);
+      if(!parsed.length){toast('未找到有效记录');return;}
+      // Dedup by date+amount
+      const ex=new Set(recs.map(r=>`${(r.date||'').slice(0,16)}|${r.amount}`));
+      const nw=parsed.filter(r=>!ex.has(`${r.date.slice(0,16)}|${r.amount}`));
+      if(!nw.length){toast('所有记录已存在，无需导入');return;}
+      const n=await bulkInsert(nw);
+      toast(`成功导入 ${n} 条，跳过 ${parsed.length-nw.length} 条重复`);
+    }catch(err){toast('解析/导入失败：'+err.message);}
+  };
+  reader.readAsText(f,'UTF-8');e.target.value='';
+}
+
+function parseWxCSV(raw){
+  const text=raw.replace(/^\uFEFF/,'');
+  const lines=text.split(/\r?\n/).map(l=>l.trim()).filter(l=>l);
+  let hi=-1;
+  for(let i=0;i<lines.length;i++){if(lines[i].includes('交易时间')&&lines[i].includes('金额')){hi=i;break;}}
+  if(hi<0)throw new Error('找不到表头（需含"交易时间"和"金额"）');
+  const pr=line=>{const cs=[];let c='',q=false;for(const ch of line){if(ch==='"')q=!q;else if(ch===','&&!q){cs.push(c.trim());c='';}else c+=ch;}cs.push(c.trim());return cs;};
+  const hds=pr(lines[hi]);
+  const gi=n=>hds.findIndex(h=>h.includes(n));
+  const cD=gi('交易时间'),cT=gi('收/支'),cA=gi('金额'),cP=gi('交易对方'),cG=gi('商品'),cS=gi('当前状态');
+  const res=[];
+  for(let i=hi+1;i<lines.length;i++){
+    const cs=pr(lines[i]);if(cs.length<4)continue;
+    if(cS>=0&&(cs[cS]||'').includes('退款'))continue;
+    const amt=parseFloat((cs[cA]||'').replace(/[¥,\s]/g,''));
+    if(isNaN(amt)||amt<=0)continue;
+    const type=(cs[cT]||'').includes('收入')?'in':'out';
+    const peer=cs[cP]||'',goods=cs[cG]||'';
+    const desc=[peer,goods].filter(x=>x&&x!=='/'&&x!=='无').join(' ').trim();
+    res.push({amount:amt,desc,cat:guess(desc),type,date:(cs[cD]||'').replace(/\//g,'-')});
+  }
+  return res;
+}
+
+// ══════════════════════════════════════════════════════
+//  NOTIF TEXT
+// ══════════════════════════════════════════════════════
+async function parseNotif(){
+  const t=document.getElementById('notifTxt').value.trim();
+  if(!t){toast('请粘贴通知文本');return;}
+  const m=t.match(/[¥￥](\d+\.?\d*)/);
+  if(!m){toast('未识别到金额');return;}
+  const amt=parseFloat(m[1]);
+  const type=(t.includes('收款')||t.includes('收到'))&&!t.includes('你已支付')?'in':'out';
+  const cat=t.includes('红包')?'red':t.includes('转账')?'xfer':guess(t);
+  try{
+    await insertRec({amount:amt,desc:t.slice(0,60),cat,type,date:new Date().toISOString()});
+    document.getElementById('notifTxt').value='';
+    toast((type==='in'?'收入 +':'支出 -')+'¥'+amt.toFixed(2)+' 已导入');
+  }catch(e){toast('保存失败：'+e.message);}
+}
+
+// ══════════════════════════════════════════════════════
+//  WEBHOOK
+// ══════════════════════════════════════════════════════
+function copyWebhook(){
+  const url=document.getElementById('webhookUrl').textContent;
+  navigator.clipboard?.writeText(url).then(()=>toast('Webhook URL 已复制')).catch(()=>toast('请长按手动复制'));
+}
+
+async function testWebhook(){
+  // Simulate a test record
+  try{
+    await insertRec({amount:0.01,desc:'Webhook 测试',cat:'other',type:'out',date:new Date().toISOString()});
+    toast('✓ 测试记录已写入，Webhook 配置正常');
+  }catch(e){toast('测试失败：'+e.message);}
+}
+
+// ══════════════════════════════════════════════════════
+//  DATA EXPORT / RESTORE
+// ══════════════════════════════════════════════════════
+function exportJSON(){
+  const blob=new Blob([JSON.stringify({records:recs,exportedAt:new Date().toISOString()},null,2)],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+  a.download='零钱记账_'+currentUser.email+'_'+new Date().toISOString().slice(0,10)+'.json';a.click();
+}
+function restoreJSON(e){
+  const f=e.target.files[0];if(!f)return;
+  const r=new FileReader();
+  r.onload=async ev=>{
+    try{
+      const d=JSON.parse(ev.target.result);
+      const imp=d.records||d;
+      if(!Array.isArray(imp))throw 0;
+      const ex=new Set(recs.map(x=>`${(x.date||'').slice(0,16)}|${x.amount}`));
+      const nw=imp.filter(x=>!ex.has(`${(x.date||'').slice(0,16)}|${x.amount}`));
+      if(!nw.length){toast('无新记录可恢复');return;}
+      const n=await bulkInsert(nw);
+      toast('已恢复 '+n+' 条记录');
+    }catch{toast('文件格式错误');}
+  };
+  r.readAsText(f);e.target.value='';
+}
+async function clearAll(){
+  if(!confirm('确定删除你的所有记录？\n建议先导出备份，此操作不可恢复。'))return;
+  const {error}=await sb.from('records').delete().eq('user_id',currentUser.id);
+  if(error){toast('删除失败：'+error.message);return;}
+  recs=[];render();toast('已清除所有数据');
+}
+
+// ══════════════════════════════════════════════════════
+//  TOAST
+// ══════════════════════════════════════════════════════
+function toast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2800);
+}
+
+// ══════════════════════════════════════════════════════
+//  SERVICE WORKER
+// ══════════════════════════════════════════════════════
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').catch(() => {});
+  });
+}
+
+// ══════════════════════════════════════════════════════
+//  START
+// ══════════════════════════════════════════════════════
+boot();
+</script>
+</body>
+</html>

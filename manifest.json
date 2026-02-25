@@ -1,0 +1,28 @@
+{
+  "name": "零钱记账",
+  "short_name": "零钱记账",
+  "description": "微信支付自动分类记账 · 多用户版",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#07c160",
+  "theme_color": "#07c160",
+  "lang": "zh-CN",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' rx='112' fill='%2307c160'/><text y='360' x='64' font-size='380' font-family='Apple Color Emoji,Segoe UI Emoji'>💰</text></svg>",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' rx='112' fill='%2307c160'/><text y='360' x='64' font-size='380' font-family='Apple Color Emoji,Segoe UI Emoji'>💰</text></svg>",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "screenshots": [],
+  "categories": ["finance", "utilities"]
+}
